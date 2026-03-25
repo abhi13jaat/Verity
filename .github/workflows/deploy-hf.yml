@@ -1,0 +1,53 @@
+name: Deploy backend to Hugging Face Space
+
+# Auto-deploys the backend to the HF Space on every backend change pushed to main.
+# Required GitHub config (Settings -> Secrets and variables -> Actions):
+#   Secret:    HF_TOKEN        (a Hugging Face write token)
+#   Variable:  HF_USERNAME     (your HF username, e.g. anuragchaubey00)
+#   Variable:  HF_SPACE_NAME   (the Space name, e.g. verity-backend)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "migrations/**"
+      - "main.py"
+      - "requirements.txt"
+      - "alembic.ini"
+      - "deploy/hf/**"
+      - ".github/workflows/deploy-hf.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Assemble HF Space tree
+        run: |
+          # HF reads Dockerfile + README.md (with Space frontmatter) from the root.
+          cp deploy/hf/Dockerfile ./Dockerfile
+          cp deploy/hf/README.md ./README.md
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ vars.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME }}
+        run: |
+          set -e
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_USERNAME" ] || [ -z "$HF_SPACE_NAME" ]; then
+            echo "Missing HF_TOKEN secret or HF_USERNAME / HF_SPACE_NAME variables." >&2
+            exit 1
+          fi
+          git config user.email "ci@verity.local"
+          git config user.name "verity-ci"
+          git add -A
+          git commit -m "deploy: ${GITHUB_SHA::7}" || echo "nothing to commit"
+          git push --force \
+            "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}" \
+            HEAD:main
