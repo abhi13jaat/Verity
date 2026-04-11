@@ -1,0 +1,79 @@
+databases:
+  - name: verity-db
+    plan: free
+    databaseName: verity
+    user: postgres
+
+  - name: verity-redis
+    plan: free
+    type: redis
+
+services:
+  - type: web
+    name: verity-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: POSTGRES_URL
+        fromDatabase:
+          name: verity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: verity-redis
+          property: connectionString
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: FAST_LLM_MODEL
+        value: openai/gpt-oss-20b:free
+      - key: LLM_PROVIDER
+        value: Weights & Biases
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: verity_chunks
+      - key: APP_ENV
+        value: production
+
+  - type: web
+    name: verity-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    dockerBuildArgs:
+      - NEXT_PUBLIC_API_URL=https://verity-backend.onrender.com
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+  - type: worker
+    name: verity-celery
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    startCommand: celery -A backend.workers.celery_app worker --loglevel=info -P solo
+    envVars:
+      - key: POSTGRES_URL
+        fromDatabase:
+          name: verity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromDatabase:
+          name: verity-redis
+          property: connectionString
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: verity_chunks
+      - key: APP_ENV
+        value: production
