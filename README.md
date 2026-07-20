@@ -130,7 +130,7 @@ Honest status of components that are designed but not yet shipped:
 
 **1. Clone and setup**
 ```bash
-git clone https://github.com/anuragchaubey1224/Verity.git
+git clone https://github.com/abhi13jaat/Verity.git
 cd Verity
 python -m venv venv
 source venv/bin/activate     # macOS / Linux
